@@ -14,7 +14,7 @@ const PaymentSchema = new mongoose.Schema({
 // After saving a payment, update the corresponding invoice's amount_received
 PaymentSchema.post('save', async function(doc) {
   const Invoice = mongoose.model('Invoice');
-  const invoice = await Invoice.findById(doc.invoice_id);
+  const invoice: any = await Invoice.findById(doc.invoice_id);
   if (invoice) {
     invoice.amount_received += doc.amount;
     await invoice.save();

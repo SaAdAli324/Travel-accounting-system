@@ -62,7 +62,6 @@ export default function Dashboard() {
     chartDataMap[dateKey].Expenses += (inv.total_vendor_amount || 0);
   });
 
-  const chartData = Object.values(chartDataMap).reverse(); // Assuming API sorts newest first, let's reverse to show oldest to newest left to right, wait better to sort properly
   // Since we use object keys it might be out of order, so let's just reverse the original array or sort.
   // Actually, Object.values won't maintain order reliably. Let's rebuild it from a sorted invoice list.
   const sortedInvoices = [...invoices].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -153,7 +152,7 @@ export default function Dashboard() {
               <Tooltip 
                 cursor={{ fill: '#f8fafc' }}
                 contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                formatter={(value: number) => [`Rs. ${value.toLocaleString()}`, undefined]}
+                formatter={(value: any) => [`Rs. ${Number(value).toLocaleString()}`, '']}
               />
               <Legend wrapperStyle={{ paddingTop: '20px' }} />
               <Bar dataKey="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50} />

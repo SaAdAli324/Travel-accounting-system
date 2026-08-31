@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import { Filter, Download, X, Search } from 'lucide-react';
+import { Search, Download, Printer, X } from 'lucide-react';
 import type { COA } from '../types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';

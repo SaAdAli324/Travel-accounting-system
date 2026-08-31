@@ -2,8 +2,6 @@ import { Outlet, NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   BookOpen, 
-  Plane, 
-  Hotel, 
   Map, 
   Briefcase, 
   FileText, 

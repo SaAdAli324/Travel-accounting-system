@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
-import { Plus, Trash2, Edit2, Search, X, Loader2 } from 'lucide-react';
+import { Search, X, Loader2 } from 'lucide-react';
 import type { JournalEntry, COA, JournalLine } from '../types';
 import { DialogModal, type DialogType } from '../components/ui/DialogModal';
 
@@ -14,29 +14,17 @@ export default function Journals() {
   const [endDate, setEndDate] = useState('');
 
   // Modal State
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingJournalId, setEditingJournalId] = useState<string | null>(null);
-  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{isOpen: boolean, type: DialogType, message: string, title?: string}>({ isOpen: false, type: 'success', message: '' });
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [reference, setReference] = useState('');
-  const [narration, setNarration] = useState('');
-  const [lines, setLines] = useState<Partial<JournalLine>[]>([
-    { account_id: '', debit: 0, credit: 0 },
-    { account_id: '', debit: 0, credit: 0 }
-  ]);
 
   const fetchData = async () => {
     try {
-      const [jData, cData] = await Promise.all([
-        api.getJournals(),
-        api.getCOA()
+      const [jData] = await Promise.all([
+        api.getJournals()
       ]);
       setJournals(jData);
-      setCoaList(cData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -47,91 +35,6 @@ export default function Journals() {
   useEffect(() => {
     fetchData();
   }, []);
-
-  const handleAddLine = () => {
-    setLines([...lines, { account_id: '', debit: 0, credit: 0 }]);
-  };
-
-  const handleRemoveLine = (index: number) => {
-    setLines(lines.filter((_, i) => i !== index));
-  };
-
-  const handleUpdateLine = (index: number, field: string, value: any) => {
-    const newLines = [...lines];
-    newLines[index] = { ...newLines[index], [field]: value };
-    setLines(newLines);
-  };
-
-  const totalDebit = lines.reduce((sum, line) => sum + (line.debit || 0), 0);
-  const totalCredit = lines.reduce((sum, line) => sum + (line.credit || 0), 0);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!narration) {
-      setDialog({ isOpen: true, type: 'error', message: 'Narration is required' });
-      return;
-    }
-    if (totalDebit !== totalCredit) {
-      setDialog({ isOpen: true, type: 'error', message: 'Total Debits must equal Total Credits' });
-      return;
-    }
-    if (totalDebit === 0) {
-      setDialog({ isOpen: true, type: 'error', message: 'Entry must have a non-zero value' });
-      return;
-    }
-    
-    // Ensure all lines have accounts
-    for (const line of lines) {
-      if (!line.account_id) {
-        setDialog({ isOpen: true, type: 'error', message: 'All lines must have an account selected' });
-        return;
-      }
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      if (editingJournalId) {
-        await api.updateJournal(editingJournalId, {
-          entry: { date, reference, narration },
-          lines: lines
-        });
-      } else {
-        await api.createJournal({
-          entry: { date, reference, narration },
-          lines: lines
-        });
-      }
-      setIsModalOpen(false);
-      setEditingJournalId(null);
-      setReference('');
-      setNarration('');
-      setLines([
-        { account_id: '', debit: 0, credit: 0 },
-        { account_id: '', debit: 0, credit: 0 }
-      ]);
-      fetchData();
-      setDialog({ isOpen: true, type: 'success', message: `Journal entry ${editingJournalId ? 'updated' : 'created'} successfully!` });
-    } catch (err) {
-      console.error(err);
-      setDialog({ isOpen: true, type: 'error', message: editingJournalId ? 'Failed to update journal entry' : 'Failed to create journal entry' });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleEditJournal = (journal: JournalEntry) => {
-    setEditingJournalId(journal.id!);
-    setDate(new Date(journal.date).toISOString().split('T')[0]);
-    setReference(journal.reference || '');
-    setNarration(journal.narration || '');
-    setLines(journal.lines.map((l: any) => ({
-      account_id: l.account_id,
-      debit: l.debit || 0,
-      credit: l.credit || 0
-    })));
-    setIsModalOpen(true);
-  };
 
   const handleDeleteClick = (id: string) => {
     setPendingDeleteId(id);
@@ -165,9 +68,10 @@ export default function Journals() {
     let matchesSearch = true;
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase();
-      matchesSearch = 
+      matchesSearch = !!(
         (journal.reference && journal.reference.toLowerCase().includes(lowerQuery)) ||
-        (journal.narration && journal.narration.toLowerCase().includes(lowerQuery));
+        (journal.narration && journal.narration.toLowerCase().includes(lowerQuery))
+      );
     }
     
     let matchesDate = true;

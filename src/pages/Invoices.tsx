@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, ChevronDown, ChevronRight, DollarSign, Edit2, Trash2, MoreVertical, Search, X, Loader2 } from 'lucide-react';
+import { Plus, Search, Eye, Filter, Edit, Trash2, X, Loader2, DollarSign, Edit2 } from 'lucide-react';
 import { api } from '../services/api';
 import type { Invoice, Party, InvoiceSection } from '../types';
 import { DialogModal, type DialogType } from '../components/ui/DialogModal';
