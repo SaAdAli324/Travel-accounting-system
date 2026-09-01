@@ -214,14 +214,7 @@ export default function Invoices() {
       headStyles: { fillColor: [59, 130, 246] }
     });
 
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    
-    doc.text(`Total Amount: Rs. ${(inv.total_selling_amount || 0).toLocaleString()}`, 130, finalY);
-    doc.text(`Amount Received: Rs. ${(inv.amount_received || 0).toLocaleString()}`, 130, finalY + 7);
-    doc.setFont(undefined, 'bold');
-    doc.text(`Balance Due: Rs. ${((inv.total_selling_amount || 0) - (inv.amount_received || 0)).toLocaleString()}`, 130, finalY + 14);
-
-    let currentY = finalY + 25;
+    let currentY = (doc as any).lastAutoTable.finalY + 10;
 
     if (payments && payments.length > 0) {
       doc.setFont(undefined, 'bold');
@@ -248,7 +241,17 @@ export default function Invoices() {
           2: { cellWidth: 'auto' }
         }
       });
+      
+      currentY = (doc as any).lastAutoTable.finalY + 10;
     }
+
+    // Totals block at the very bottom
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Total Amount: Rs. ${(inv.total_selling_amount || 0).toLocaleString()}`, 130, currentY);
+    doc.text(`Amount Received: Rs. ${(inv.amount_received || 0).toLocaleString()}`, 130, currentY + 7);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Balance Due: Rs. ${((inv.total_selling_amount || 0) - (inv.amount_received || 0)).toLocaleString()}`, 130, currentY + 14);
 
     doc.save(`Invoice_${inv.invoice_number}.pdf`);
   };
