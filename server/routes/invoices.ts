@@ -18,8 +18,16 @@ router.get('/', async (req: Request, res: Response) => {
 
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const count = await Invoice.countDocuments();
-    const invoice_number = `INV-${new Date().getFullYear()}-${1000 + count + 1}`;
+    const year = new Date().getFullYear();
+    const lastInvoice = await Invoice.findOne({ invoice_number: new RegExp(`^INV-${year}-`) }).sort({ createdAt: -1 });
+    let nextNum = 1001;
+    if (lastInvoice && lastInvoice.invoice_number) {
+      const parts = lastInvoice.invoice_number.split('-');
+      if (parts.length === 3) {
+        nextNum = parseInt(parts[2], 10) + 1;
+      }
+    }
+    const invoice_number = `INV-${year}-${nextNum}`;
     
     const newInvoice = new Invoice({
       ...req.body,

@@ -9,6 +9,7 @@ export default function Ledger() {
   const [coa, setCoa] = useState<COA[]>([]);
   const [parties, setParties] = useState<any[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<string>('');
+  const [selectedParty, setSelectedParty] = useState<string>('');
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [selectedJournalId, setSelectedJournalId] = useState<string | null>(null);
@@ -25,40 +26,50 @@ export default function Ledger() {
   }, []);
 
   useEffect(() => {
-    if (!selectedAccount) {
+    if (selectedAccount) {
       setLoading(true);
-      api.getJournals()
-        .then(data => {
-          const lines: any[] = [];
-          data.forEach((j: any) => {
-            j.lines.forEach((l: any) => {
-              lines.push({
-                id: Math.random().toString(),
-                journal_entry_id: j.id || j._id,
-                date: j.date,
-                reference: j.reference,
-                narration: j.narration,
-                account_id: l.account_id,
-                party_id: l.party_id,
-                debit: l.debit || 0,
-                credit: l.credit || 0,
-                balance: 0
-              });
-            });
-          });
-          lines.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          setEntries(lines);
-        })
+      api.getLedger(selectedAccount)
+        .then(setEntries)
         .catch(console.error)
         .finally(() => setLoading(false));
       return;
     }
+    
+    if (selectedParty) {
+      setLoading(true);
+      api.getPartyLedger(selectedParty)
+        .then(setEntries)
+        .catch(console.error)
+        .finally(() => setLoading(false));
+      return;
+    }
+
     setLoading(true);
-    api.getLedger(selectedAccount)
-      .then(setEntries)
+    api.getJournals()
+      .then(data => {
+        const lines: any[] = [];
+        data.forEach((j: any) => {
+          j.lines.forEach((l: any) => {
+            lines.push({
+              id: Math.random().toString(),
+              journal_entry_id: j.id || j._id,
+              date: j.date,
+              reference: j.reference,
+              narration: j.narration,
+              account_id: l.account_id,
+              party_id: l.party_id,
+              debit: l.debit || 0,
+              credit: l.credit || 0,
+              balance: 0
+            });
+          });
+        });
+        lines.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setEntries(lines);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [selectedAccount]);
+  }, [selectedAccount, selectedParty]);
 
   useEffect(() => {
     if (!selectedJournalId) {
@@ -132,7 +143,7 @@ export default function Ledger() {
     
     
     const tableColumn = ["Date", "Reference", "Narration", "Account", "Party", "Debit", "Credit"];
-    if (selectedAccount) tableColumn.push("Balance");
+    if (selectedAccount || selectedParty) tableColumn.push("Balance");
     
     const tableRows: any[] = [];
 
@@ -144,25 +155,29 @@ export default function Ledger() {
         new Date(entry.date).toLocaleDateString(),
         entry.reference,
         entry.narration,
-        !selectedAccount ? (acc ? `${acc.account_code} - ${acc.account_name}` : 'Unknown') : '',
+        acc ? `${acc.account_code} - ${acc.account_name}` : 'Unknown',
         party ? party.name : '-',
         entry.debit > 0 ? entry.debit : '-',
         entry.credit > 0 ? entry.credit : '-',
       ];
-      if (!selectedAccount) {
-         // keep account
-      } else {
-         // remove account column data and put balance at end
+
+      if (selectedAccount) {
          entryData.splice(3, 1);
+      } else if (selectedParty) {
+         entryData.splice(4, 1);
+      }
+
+      if (selectedAccount || selectedParty) {
          entryData.push(entry.balance);
       }
+
       tableRows.push(entryData);
     });
 
-    if (!selectedAccount) {
-        tableColumn.splice(3, 1, "Account");
-    } else {
-        tableColumn.splice(3, 1); // remove account column header
+    if (selectedAccount) {
+        tableColumn.splice(3, 1);
+    } else if (selectedParty) {
+        tableColumn.splice(4, 1);
     }
 
     const startY = (settings && settings.company_name && settings.show_on_reports !== false) ? (settings.contact_number || settings.address ? 42 : 35) : 20;
@@ -197,12 +212,33 @@ export default function Ledger() {
           <select 
             className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
             value={selectedAccount}
-            onChange={(e) => setSelectedAccount(e.target.value)}
+            onChange={(e) => {
+              setSelectedAccount(e.target.value);
+              setSelectedParty('');
+            }}
           >
             <option value="">Select an account...</option>
             {coa.map(account => (
               <option key={account.id} value={account.id}>
                 {account.account_code} - {account.account_name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex-1 min-w-[200px] max-w-xs">
+          <label className="block text-sm font-medium text-slate-700 mb-1">Customer</label>
+          <select 
+            className="w-full border border-slate-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            value={selectedParty}
+            onChange={(e) => {
+              setSelectedParty(e.target.value);
+              setSelectedAccount('');
+            }}
+          >
+            <option value="">Select a customer...</option>
+            {parties.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.name}
               </option>
             ))}
           </select>
@@ -260,10 +296,10 @@ export default function Ledger() {
                 <th className="px-6 py-4">Reference</th>
                 <th className="px-6 py-4">Narration</th>
                 {!selectedAccount && <th className="px-6 py-4">Account</th>}
-                <th className="px-6 py-4">Party</th>
+                {!selectedParty && <th className="px-6 py-4">Customer</th>}
                 <th className="px-6 py-4 text-right">Debit</th>
                 <th className="px-6 py-4 text-right">Credit</th>
-                {selectedAccount && <th className="px-6 py-4 text-right bg-slate-100">Balance</th>}
+                {(selectedAccount || selectedParty) && <th className="px-6 py-4 text-right bg-slate-100">Balance</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -297,16 +333,18 @@ export default function Ledger() {
                           {acc ? `${acc.account_code} - ${acc.account_name}` : 'Unknown'}
                         </td>
                       )}
-                      <td className="px-6 py-3 text-slate-700">
-                        {party ? party.name : '-'}
-                      </td>
+                      {!selectedParty && (
+                        <td className="px-6 py-3 text-slate-700">
+                          {party ? party.name : '-'}
+                        </td>
+                      )}
                       <td className="px-6 py-3 text-right">
                         {entry.debit > 0 ? `Rs. ${entry.debit.toLocaleString()}` : '-'}
                       </td>
                       <td className="px-6 py-3 text-right">
                         {entry.credit > 0 ? `Rs. ${entry.credit.toLocaleString()}` : '-'}
                       </td>
-                      {selectedAccount && (
+                      {(selectedAccount || selectedParty) && (
                         <td className="px-6 py-3 text-right font-medium bg-slate-50">
                           Rs. {entry.balance.toLocaleString()}
                         </td>

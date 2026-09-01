@@ -108,6 +108,11 @@ export const api = {
     if (!res.ok) throw new Error('Failed to fetch ledger');
     return res.json();
   },
+  getPartyLedger: async (partyId: string) => {
+    const res = await authFetch(`${API_URL}/ledger/party/${partyId}`);
+    if (!res.ok) throw new Error('Failed to fetch party ledger');
+    return res.json();
+  },
 
   // Invoices
   getInvoices: async () => {
