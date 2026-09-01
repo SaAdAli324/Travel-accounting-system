@@ -66,11 +66,18 @@ export async function syncPaymentJournalEntry(payment: any) {
 
   const invoice = await Invoice.findById(payment.invoice_id);
   const invNumber = invoice ? invoice.invoice_number : 'Unknown';
+  
+  // Need to import Party model at the top, or just use mongoose.model('Party')
+  // We'll require Party dynamically or import it.
+  const mongoose = await import('mongoose');
+  const Party = mongoose.model('Party');
+  const party = await Party.findById(payment.party_id);
+  const partyName = party ? (party as any).name : 'Customer';
 
   const entryData = {
     date: payment.date,
     reference: payment.reference || invNumber,
-    narration: `✅ Payment Cleared for Invoice ${invNumber}`,
+    narration: `✅ Payment of Rs. ${payment.amount.toLocaleString()} received from ${partyName} for Invoice ${invNumber}`,
     is_automated: true,
     lines
   };
