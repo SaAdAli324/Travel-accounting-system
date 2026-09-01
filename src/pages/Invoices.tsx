@@ -34,6 +34,7 @@ export default function Invoices() {
   // Payment Form State
   const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
+  const [paymentNotes, setPaymentNotes] = useState<string>('');
 
   const fetchInitialData = async () => {
     try {
@@ -115,8 +116,10 @@ export default function Invoices() {
 
   const handlePrintInvoice = async (inv: Invoice) => {
     let settings: any = null;
+    let payments: any[] = [];
     try {
       settings = await api.getSettings();
+      payments = await api.getPayments(inv.id!);
     } catch (err) {
       console.error(err);
     }
@@ -161,10 +164,12 @@ export default function Invoices() {
     doc.text(`Date: ${new Date(inv.date).toLocaleDateString()}`, 140, 32);
     doc.text(`Status: ${inv.status}`, 140, 37);
     
-    let y = Math.max(startY, 45);
+    let y = Math.max(startY, 50) + 10;
     
     doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
     doc.text("Bill To:", 14, y);
+    doc.setFont(undefined, 'normal');
     doc.setFontSize(10);
     if (party) {
       doc.text(party.name, 14, y + 5);
@@ -216,6 +221,35 @@ export default function Invoices() {
     doc.setFont(undefined, 'bold');
     doc.text(`Balance Due: Rs. ${((inv.total_selling_amount || 0) - (inv.amount_received || 0)).toLocaleString()}`, 130, finalY + 14);
 
+    let currentY = finalY + 25;
+
+    if (payments && payments.length > 0) {
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(11);
+      doc.text("Payment History", 14, currentY);
+      currentY += 5;
+
+      const paymentRows = payments.map(p => {
+        const pDate = new Date(p.date).toLocaleDateString();
+        const pAmount = `Rs. ${p.amount.toLocaleString()}`;
+        const pRemarks = p.notes ? p.notes : '-';
+        return [pDate, pAmount, pRemarks];
+      });
+
+      autoTable(doc, {
+        head: [["Date", "Amount Paid", "Remarks"]],
+        body: paymentRows,
+        startY: currentY,
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [100, 116, 139] }, // slate-500
+        columnStyles: {
+          0: { cellWidth: 30 },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 'auto' }
+        }
+      });
+    }
+
     doc.save(`Invoice_${inv.invoice_number}.pdf`);
   };
 
@@ -231,10 +265,12 @@ export default function Invoices() {
         party_id: typeof invoice.party_id === 'object' ? (invoice.party_id as any)._id || (invoice.party_id as any).id : invoice.party_id,
         date: new Date().toISOString().split('T')[0],
         amount: paymentAmount,
+        notes: paymentNotes,
         payment_method: 'Cash'
       });
       setPaymentInvoiceId(null);
       setPaymentAmount(0);
+      setPaymentNotes('');
       fetchInitialData();
       setDialog({ isOpen: true, type: 'success', message: 'Payment recorded successfully!' });
     } catch (err) {
@@ -447,9 +483,19 @@ export default function Invoices() {
               <label className="block text-sm font-medium text-slate-700 mb-1">Amount (Rs.)</label>
               <input 
                 type="number" 
-                className="w-full border p-2 rounded"
+                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
                 value={paymentAmount || ''}
                 onChange={e => setPaymentAmount(Number(e.target.value))}
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Remarks / Notes</label>
+              <textarea 
+                className="w-full border p-2 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                value={paymentNotes}
+                onChange={e => setPaymentNotes(e.target.value)}
+                placeholder="e.g., received in bank from TerraTrekTours"
+                rows={2}
               />
             </div>
             <div className="flex justify-end gap-2">
