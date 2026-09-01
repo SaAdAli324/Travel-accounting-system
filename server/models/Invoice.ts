@@ -4,6 +4,10 @@ const InvoiceSectionSchema = new mongoose.Schema({
   description: { type: String, default: '' },
   vendor_amount: { type: Number, required: true, default: 0 },
   selling_amount: { type: Number, required: true, default: 0 },
+  check_in: { type: String },
+  check_out: { type: String },
+  room_type: { type: String },
+  meal_plan: { type: String }
 });
 
 const InvoiceSchema = new mongoose.Schema({

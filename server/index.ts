@@ -67,31 +67,32 @@ const seedSystemAccounts = async () => {
 };
 
 const seedAdminUser = async () => {
-  let admin = await User.findOne({ username: 'admin' });
-  const hashedPassword = await bcrypt.hash('admin123', 10);
-  if (!admin) {
-    admin = new User({
-      username: 'admin',
-      password: hashedPassword,
-      role: 'admin'
-    });
-    await admin.save();
-    console.log('Seeded default admin user (admin / admin123)');
-  } else {
-    admin.password = hashedPassword;
-    admin.role = 'admin';
-    await admin.save();
-    console.log('Reset admin password to admin123 and ensured admin role');
+  try {
+    let admin = await User.findOne({ username: 'admin' });
+    if (!admin) {
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      admin = new User({
+        username: 'admin',
+        password: hashedPassword,
+        role: 'admin'
+      });
+      await admin.save();
+      console.log('Seeded default admin user (admin / admin123)');
+    }
+  } catch (error) {
+    console.error('Error seeding admin user:', error);
   }
 };
 
-mongoose.connect(MONGODB_URI)
-  .then(() => {
-    console.log('Connected to MongoDB Atlas');
-    seedSystemAccounts();
-    seedAdminUser();
-  })
-  .catch(err => console.error('MongoDB connection error:', err));
+if (mongoose.connection.readyState === 0) {
+  mongoose.connect(MONGODB_URI)
+    .then(() => {
+      console.log('Connected to MongoDB Atlas');
+      seedSystemAccounts();
+      seedAdminUser();
+    })
+    .catch(err => console.error('MongoDB connection error:', err));
+}
 
 // API Routes
 app.use('/api/auth', authRoutes);

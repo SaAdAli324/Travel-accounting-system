@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Eye, Filter, Edit, Trash2, X, Loader2, DollarSign, Edit2 } from 'lucide-react';
+import { Plus, Search, Trash2, X, Loader2, DollarSign, Edit2, Printer } from 'lucide-react';
 import { api } from '../services/api';
-import type { Invoice, Party, InvoiceSection } from '../types';
+import type { Invoice, Party } from '../types';
 import { DialogModal, type DialogType } from '../components/ui/DialogModal';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { InvoiceForm } from '../components/invoices/InvoiceForm';
+import { InvoicePreviewModal } from '../components/invoices/InvoicePreviewModal';
+import { logoBase64 } from '../assets/logoBase64';
 
 export default function Invoices() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -15,17 +20,12 @@ export default function Invoices() {
   
   // Create Form State
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
-  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   
-  const [hotelSections, setHotelSections] = useState<InvoiceSection[]>([]);
-  const [ticketSections, setTicketSections] = useState<InvoiceSection[]>([]);
-  const [visaSections, setVisaSections] = useState<InvoiceSection[]>([]);
-  const [otherSections, setOtherSections] = useState<InvoiceSection[]>([]);
-  const [amountReceived, setAmountReceived] = useState<number>(0);
+  // Preview State
+  const [previewInvoice, setPreviewInvoice] = useState<Invoice | null>(null);
 
   // Loaders & Dialogs
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [isRecordingPayment, setIsRecordingPayment] = useState(false);
@@ -54,64 +54,20 @@ export default function Invoices() {
     fetchInitialData();
   }, []);
 
-  const handleAddSection = (type: 'hotel' | 'tickets' | 'visa' | 'other') => {
-    const newSection = { description: '', vendor_amount: 0, selling_amount: 0 };
-    if (type === 'hotel') setHotelSections([...hotelSections, newSection]);
-    if (type === 'tickets') setTicketSections([...ticketSections, newSection]);
-    if (type === 'visa') setVisaSections([...visaSections, newSection]);
-    if (type === 'other') setOtherSections([...otherSections, newSection]);
-  };
-
-  const handleUpdateSection = (type: string, index: number, field: string, value: any) => {
-    const updateArray = (arr: any[]) => {
-      const newArr = [...arr];
-      newArr[index] = { ...newArr[index], [field]: value };
-      return newArr;
-    };
-    if (type === 'hotel') setHotelSections(updateArray(hotelSections));
-    if (type === 'tickets') setTicketSections(updateArray(ticketSections));
-    if (type === 'visa') setVisaSections(updateArray(visaSections));
-    if (type === 'other') setOtherSections(updateArray(otherSections));
-  };
-
-  const handleSubmitInvoice = async () => {
-    if (!selectedCustomerId) {
-      setDialog({ isOpen: true, type: 'error', message: 'Please select a customer' });
-      return;
-    }
-    
-    setIsSubmitting(true);
+  const handleSaveInvoice = async (data: any) => {
     try {
-      const data = {
-        party_id: selectedCustomerId,
-        date: new Date().toISOString().split('T')[0],
-        hotel: hotelSections,
-        tickets: ticketSections,
-        visa: visaSections,
-        other: otherSections,
-        amount_received: amountReceived
-      };
-      
-      if (editingInvoiceId) {
-        await api.updateInvoice(editingInvoiceId, data);
+      if (editingInvoice) {
+        await api.updateInvoice(editingInvoice.id!, data);
       } else {
         await api.createInvoice(data);
       }
-      
       setShowCreateForm(false);
-      setEditingInvoiceId(null);
-      setHotelSections([]);
-      setTicketSections([]);
-      setVisaSections([]);
-      setOtherSections([]);
-      setAmountReceived(0);
+      setEditingInvoice(null);
       fetchInitialData();
-      setDialog({ isOpen: true, type: 'success', message: `Invoice ${editingInvoiceId ? 'updated' : 'created'} successfully!` });
+      setDialog({ isOpen: true, type: 'success', message: `Invoice ${editingInvoice ? 'updated' : 'created'} successfully!` });
     } catch (err: any) {
       console.error(err);
-      setDialog({ isOpen: true, type: 'error', message: err.message || (editingInvoiceId ? "Failed to update invoice" : "Failed to create invoice") });
-    } finally {
-      setIsSubmitting(false);
+      setDialog({ isOpen: true, type: 'error', message: err.message || (editingInvoice ? "Failed to update invoice" : "Failed to create invoice") });
     }
   };
 
@@ -120,13 +76,7 @@ export default function Invoices() {
       setDialog({ isOpen: true, type: 'error', message: 'Paid invoices cannot be edited.' });
       return;
     }
-    setEditingInvoiceId(inv.id!);
-    setSelectedCustomerId(typeof inv.party_id === 'object' ? (inv.party_id as any)._id || (inv.party_id as any).id : inv.party_id);
-    setHotelSections(inv.hotel || []);
-    setTicketSections(inv.tickets || []);
-    setVisaSections(inv.visa || []);
-    setOtherSections(inv.other || []);
-    setAmountReceived(inv.amount_received || 0);
+    setEditingInvoice(inv);
     setShowCreateForm(true);
   };
 
@@ -163,6 +113,112 @@ export default function Invoices() {
     setPendingDeleteId(null);
   };
 
+  const handlePrintInvoice = async (inv: Invoice) => {
+    let settings: any = null;
+    try {
+      settings = await api.getSettings();
+    } catch (err) {
+      console.error(err);
+    }
+    const party = customers.find(c => c.id === (typeof inv.party_id === 'object' ? (inv.party_id as any).id || (inv.party_id as any)._id : inv.party_id));
+
+    const doc = new jsPDF();
+    
+    // Add Logo
+    try {
+      // The uploaded logo is a square, so we use equal width and height (40x40) to prevent stretching
+      doc.addImage(logoBase64, 'JPEG', 14, 5, 45, 45);
+    } catch (e) {
+      console.error("Failed to add logo", e);
+    }
+
+    let startY = 45; // Start address below the logo text
+
+    // Add Company Info
+    if (settings && settings.show_on_reports !== false) {
+      doc.setFontSize(10);
+      let yOffset = startY;
+      if (settings.address) {
+        doc.text(settings.address, 14, yOffset);
+        yOffset += 5;
+      }
+      if (settings.contact_number || settings.ntn_number) {
+        const contactLine = [
+          settings.contact_number ? `Contact: ${settings.contact_number}` : '',
+          settings.ntn_number ? `NTN: ${settings.ntn_number}` : ''
+        ].filter(Boolean).join(' | ');
+        doc.text(contactLine, 14, yOffset);
+      }
+      startY = yOffset + 5;
+    } else {
+      startY += 10;
+    }
+    
+    doc.setFontSize(14);
+    doc.text("INVOICE", 140, 20);
+    doc.setFontSize(10);
+    doc.text(`Invoice Number: ${inv.invoice_number}`, 140, 27);
+    doc.text(`Date: ${new Date(inv.date).toLocaleDateString()}`, 140, 32);
+    doc.text(`Status: ${inv.status}`, 140, 37);
+    
+    let y = Math.max(startY, 45);
+    
+    doc.setFontSize(11);
+    doc.text("Bill To:", 14, y);
+    doc.setFontSize(10);
+    if (party) {
+      doc.text(party.name, 14, y + 5);
+      if (party.phone) doc.text(party.phone, 14, y + 10);
+    } else {
+      doc.text("Unknown Customer", 14, y + 5);
+    }
+    
+    y += 20;
+
+    const tableRows: any[] = [];
+    
+    const sections = [
+      { name: 'Hotel', data: inv.hotel || [] },
+      { name: 'Tickets', data: inv.tickets || [] },
+      { name: 'Visa', data: inv.visa || [] },
+      { name: 'Other', data: inv.other || [] },
+    ];
+    
+    sections.forEach(sec => {
+      sec.data.forEach((item: any) => {
+        if (item.selling_amount > 0 || item.description) {
+           let desc = `${sec.name}: ${item.description}`;
+           if (sec.name === 'Hotel' && (item.check_in || item.check_out || item.room_type || item.meal_plan)) {
+             const details = [];
+             if (item.check_in) details.push(`In: ${item.check_in}`);
+             if (item.check_out) details.push(`Out: ${item.check_out}`);
+             if (item.room_type) details.push(item.room_type);
+             if (item.meal_plan) details.push(item.meal_plan);
+             desc += `\n(${details.join(' | ')})`;
+           }
+           tableRows.push([desc, `Rs. ${item.selling_amount.toLocaleString()}`]);
+        }
+      });
+    });
+
+    autoTable(doc, {
+      head: [["Description", "Amount"]],
+      body: tableRows,
+      startY: y,
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [59, 130, 246] }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    
+    doc.text(`Total Amount: Rs. ${(inv.total_selling_amount || 0).toLocaleString()}`, 130, finalY);
+    doc.text(`Amount Received: Rs. ${(inv.amount_received || 0).toLocaleString()}`, 130, finalY + 7);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Balance Due: Rs. ${((inv.total_selling_amount || 0) - (inv.amount_received || 0)).toLocaleString()}`, 130, finalY + 14);
+
+    doc.save(`Invoice_${inv.invoice_number}.pdf`);
+  };
+
   const handleReceivePayment = async () => {
     if (!paymentInvoiceId || paymentAmount <= 0) return;
     const invoice = invoices.find(i => i.id === paymentInvoiceId);
@@ -189,35 +245,6 @@ export default function Invoices() {
     }
   };
 
-  const renderSectionInputs = (title: string, type: string, sections: InvoiceSection[]) => (
-    <div className="mb-4 p-4 border border-slate-200 rounded-lg">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="font-semibold">{title}</h3>
-        <button onClick={() => handleAddSection(type as any)} className="text-blue-600 text-sm hover:underline flex items-center">
-          <Plus className="w-3 h-3 mr-1" /> Add {title}
-        </button>
-      </div>
-      {sections.map((sec, i) => (
-        <div key={i} className="flex gap-2 mb-2">
-          <input 
-            type="text" placeholder="Description" 
-            className="flex-1 border p-2 rounded text-sm"
-            value={sec.description} onChange={e => handleUpdateSection(type, i, 'description', e.target.value)} 
-          />
-          <input 
-            type="number" placeholder="Vendor Cost" 
-            className="w-32 border p-2 rounded text-sm"
-            value={sec.vendor_amount || ''} onChange={e => handleUpdateSection(type, i, 'vendor_amount', Number(e.target.value))} 
-          />
-          <input 
-            type="number" placeholder="Selling Price" 
-            className="w-32 border p-2 rounded text-sm"
-            value={sec.selling_amount || ''} onChange={e => handleUpdateSection(type, i, 'selling_amount', Number(e.target.value))} 
-          />
-        </div>
-      ))}
-    </div>
-  );
 
   const filteredInvoices = invoices.filter(inv => {
     let matchesSearch = true;
@@ -250,13 +277,7 @@ export default function Invoices() {
         {!showCreateForm && (
           <button 
             onClick={() => {
-              setEditingInvoiceId(null);
-              setSelectedCustomerId('');
-              setHotelSections([]);
-              setTicketSections([]);
-              setVisaSections([]);
-              setOtherSections([]);
-              setAmountReceived(0);
+              setEditingInvoice(null);
               setShowCreateForm(true);
             }}
             className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors">
@@ -314,52 +335,16 @@ export default function Invoices() {
       )}
 
       {showCreateForm ? (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-          <h3 className="text-lg font-bold mb-4">{editingInvoiceId ? 'Edit Invoice' : 'New Invoice'}</h3>
-          
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-1">Select Customer</label>
-            <select 
-              className="w-full border p-2 rounded"
-              value={selectedCustomerId}
-              onChange={e => setSelectedCustomerId(e.target.value)}
-            >
-              <option value="">-- Select Customer --</option>
-              {customers.map(c => (
-                <option key={c.id} value={c.id}>{c.customer_code} - {c.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {renderSectionInputs('Hotels', 'hotel', hotelSections)}
-          {renderSectionInputs('Tickets', 'tickets', ticketSections)}
-          {renderSectionInputs('Visa', 'visa', visaSections)}
-          {renderSectionInputs('Other', 'other', otherSections)}
-          
-          <div className="mb-4 p-4 border border-slate-200 rounded-lg bg-slate-50">
-            <h3 className="font-semibold mb-2 text-slate-700">Payment Details (Optional)</h3>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="block text-sm text-slate-600 mb-1">Amount Received So Far</label>
-                <input 
-                  type="number" 
-                  className="w-full border p-2 rounded text-sm bg-white"
-                  value={amountReceived === 0 ? '' : amountReceived}
-                  onChange={e => setAmountReceived(Number(e.target.value))}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 mt-4">
-            <button type="button" disabled={isSubmitting} onClick={() => { setShowCreateForm(false); setEditingInvoiceId(null); }} className="px-4 py-2 text-slate-600 bg-slate-100 rounded hover:bg-slate-200 disabled:opacity-50">Cancel</button>
-            <button onClick={handleSubmitInvoice} disabled={isSubmitting} className="px-4 py-2 text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
-              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
-              {editingInvoiceId ? 'Update Invoice' : 'Save Invoice'}
-            </button>
-          </div>
-        </div>
+        <InvoiceForm
+          mode={editingInvoice ? 'edit' : 'create'}
+          initialData={editingInvoice}
+          customers={customers}
+          onSave={handleSaveInvoice}
+          onCancel={() => {
+            setShowCreateForm(false);
+            setEditingInvoice(null);
+          }}
+        />
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
@@ -384,7 +369,11 @@ export default function Invoices() {
                   <tr><td colSpan={9} className="px-6 py-8 text-center text-slate-500">No invoices found for this filter.</td></tr>
                 ) : (
                   filteredInvoices.map((inv) => (
-                    <tr key={inv.id} className="hover:bg-slate-50 transition-colors">
+                    <tr 
+                      key={inv.id} 
+                      className="hover:bg-slate-50 transition-colors cursor-pointer"
+                      onClick={() => setPreviewInvoice(inv)}
+                    >
                       <td className="px-6 py-3 font-medium text-slate-900">{inv.invoice_number}</td>
                       <td className="px-6 py-3">{(inv.party_id as any)?.name || 'Unknown'}</td>
                       <td className="px-6 py-3">{new Date(inv.date).toLocaleDateString()}</td>
@@ -401,26 +390,33 @@ export default function Invoices() {
                           {inv.status}
                         </span>
                       </td>
-                      <td className="px-6 py-3 text-center">
+                      <td className="px-6 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-3">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handlePrintInvoice(inv); }}
+                            className="text-slate-600 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 p-1.5 rounded-full transition-colors"
+                            title="Print Invoice"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
                           {inv.status !== 'Paid' ? (
                             <>
                               <button 
-                                onClick={() => setPaymentInvoiceId(inv.id!)}
+                                onClick={(e) => { e.stopPropagation(); setPaymentInvoiceId(inv.id!); }}
                                 className="text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 p-1.5 rounded-full transition-colors"
                                 title="Receive Payment"
                               >
                                 <DollarSign className="w-4 h-4" />
                               </button>
                               <button 
-                                onClick={() => handleEditInvoice(inv)}
+                                onClick={(e) => { e.stopPropagation(); handleEditInvoice(inv); }}
                                 className="text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 p-1.5 rounded-full transition-colors"
                                 title="Edit Invoice"
                               >
                                 <Edit2 className="w-4 h-4" />
                               </button>
                               <button 
-                                onClick={() => handleDeleteClick(inv.id!)}
+                                onClick={(e) => { e.stopPropagation(); handleDeleteClick(inv.id!); }}
                                 disabled={deletingId === inv.id}
                                 className="text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 p-1.5 rounded-full transition-colors disabled:opacity-50"
                                 title="Delete Invoice"
@@ -476,6 +472,15 @@ export default function Invoices() {
         onConfirm={confirmDelete}
         isProcessing={deletingId !== null}
       />
+      
+      {previewInvoice && (
+        <InvoicePreviewModal
+          invoice={previewInvoice}
+          party={customers.find(c => c.id === (typeof previewInvoice.party_id === 'object' ? (previewInvoice.party_id as any).id || (previewInvoice.party_id as any)._id : previewInvoice.party_id))}
+          onClose={() => setPreviewInvoice(null)}
+          onPrint={handlePrintInvoice}
+        />
+      )}
     </div>
   );
 }

@@ -47,6 +47,10 @@ export interface InvoiceSection {
   description: string;
   vendor_amount: number;
   selling_amount: number;
+  check_in?: string;
+  check_out?: string;
+  room_type?: string;
+  meal_plan?: string;
 }
 
 export interface Invoice {

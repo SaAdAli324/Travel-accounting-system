@@ -4,6 +4,7 @@ import { Search, Download, Printer, X } from 'lucide-react';
 import type { COA } from '../types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { logoBase64 } from '../assets/logoBase64';
 
 export default function Ledger() {
   const [coa, setCoa] = useState<COA[]>([]);
@@ -113,12 +114,20 @@ export default function Ledger() {
 
     const doc = new jsPDF();
     
+    // Add Logo
+    try {
+      // The uploaded logo is a square, so we use equal width and height (45x45)
+      doc.addImage(logoBase64, 'JPEG', 14, 5, 45, 45);
+    } catch (e) {
+      console.error("Failed to add logo", e);
+    }
+
+    let startY = 45;
+
     // Add Company Info
-    if (settings && settings.company_name && settings.show_on_reports !== false) {
-      doc.setFontSize(16);
-      doc.text(settings.company_name, 14, 15);
+    if (settings && settings.show_on_reports !== false) {
       doc.setFontSize(10);
-      let yOffset = 22;
+      let yOffset = startY;
       if (settings.address) {
         doc.text(settings.address, 14, yOffset);
         yOffset += 5;
@@ -135,10 +144,13 @@ export default function Ledger() {
       doc.setFontSize(14);
       doc.text("General Ledger", 14, yOffset);
       doc.setFontSize(10);
+      startY = yOffset + 5;
     } else {
+      startY += 10;
       doc.setFontSize(14);
-      doc.text("General Ledger", 14, 15);
+      doc.text("General Ledger", 14, startY);
       doc.setFontSize(10);
+      startY += 5;
     }
     
     
@@ -179,8 +191,6 @@ export default function Ledger() {
     } else if (selectedParty) {
         tableColumn.splice(4, 1);
     }
-
-    const startY = (settings && settings.company_name && settings.show_on_reports !== false) ? (settings.contact_number || settings.address ? 42 : 35) : 20;
 
     autoTable(doc, {
       head: [tableColumn],
