@@ -54,6 +54,8 @@ const seedSystemAccounts = async () => {
     { account_code: '4010', account_name: 'Ticket Sales Revenue', account_type: 'revenue', is_system: true },
     { account_code: '4020', account_name: 'Hotel Sales Revenue', account_type: 'revenue', is_system: true },
     { account_code: '4030', account_name: 'Visa Sales Revenue', account_type: 'revenue', is_system: true },
+    { account_code: '4040', account_name: 'Tours Revenue', account_type: 'revenue', is_system: true },
+    { account_code: '4050', account_name: 'Transport Revenue', account_type: 'revenue', is_system: true },
     { account_code: '4090', account_name: 'Other Revenue', account_type: 'revenue', is_system: true },
   ];
 

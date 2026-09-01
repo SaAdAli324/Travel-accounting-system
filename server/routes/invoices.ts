@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { Invoice } from '../models/Invoice.js';
 import { JournalEntry } from '../models/Journal.js';
 import { Payment } from '../models/Payment.js';
-import { syncInvoiceJournalEntry } from '../utils/journalHelpers.js';
+import { syncInvoiceJournalEntry, syncPaymentJournalEntry } from '../utils/journalHelpers.js';
 import { requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -40,6 +40,50 @@ router.post('/', async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to create invoice' });
+  }
+});
+
+router.post('/:id/refund', async (req: Request, res: Response): Promise<any> => {
+  try {
+    let invoice = await Invoice.findById(req.params.id);
+    if (!invoice) return res.status(404).json({ error: 'Not found' });
+    
+    const refundData = {
+      date: new Date().toISOString().split('T')[0],
+      description: req.body.description,
+      vendor_amount: Number(req.body.vendor_amount) || 0,
+      selling_amount: Number(req.body.selling_amount) || 0,
+    };
+    
+    // Add refund to invoice and save FIRST to avoid VersionError
+    invoice.refunds = invoice.refunds || [];
+    invoice.refunds.push(refundData);
+    await invoice.save(); // This will recalculate totals via pre-save hook
+    await syncInvoiceJournalEntry(invoice);
+    
+    // Check if we need to issue a cash refund (negative payment)
+    if (invoice.amount_received > 0 && refundData.selling_amount > 0) {
+      const cashRefund = Math.min(invoice.amount_received, refundData.selling_amount);
+      
+      const refundPayment = new Payment({
+        invoice_id: invoice._id,
+        party_id: invoice.party_id,
+        date: refundData.date,
+        amount: -cashRefund, // Negative amount for cash out
+        payment_method: 'Cash',
+        notes: `Refund: ${refundData.description}`
+      });
+      // The Payment schema's post('save') hook will automatically update invoice.amount_received
+      await refundPayment.save();
+      await syncPaymentJournalEntry(refundPayment);
+    }
+    
+    // Re-fetch to return the final state
+    invoice = await Invoice.findById(req.params.id);
+    res.json({ ...invoice!.toObject(), id: invoice!._id.toString() });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to process refund' });
   }
 });
 

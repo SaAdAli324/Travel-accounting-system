@@ -6,16 +6,19 @@ interface InvoiceFormProps {
   mode: 'create' | 'edit';
   initialData?: Invoice | null;
   customers: Party[];
+  vendors: Party[];
   onSave: (data: any) => Promise<void>;
   onCancel: () => void;
 }
 
-export function InvoiceForm({ mode, initialData, customers, onSave, onCancel }: InvoiceFormProps) {
+export function InvoiceForm({ mode, initialData, customers, vendors, onSave, onCancel }: InvoiceFormProps) {
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedPartyId, setSelectedPartyId] = useState('');
   const [hotelSections, setHotelSections] = useState<InvoiceSection[]>([]);
   const [ticketSections, setTicketSections] = useState<InvoiceSection[]>([]);
   const [visaSections, setVisaSections] = useState<InvoiceSection[]>([]);
+  const [toursSections, setToursSections] = useState<InvoiceSection[]>([]);
+  const [transportSections, setTransportSections] = useState<InvoiceSection[]>([]);
   const [otherSections, setOtherSections] = useState<InvoiceSection[]>([]);
   const [amountReceived, setAmountReceived] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,16 +30,20 @@ export function InvoiceForm({ mode, initialData, customers, onSave, onCancel }: 
       setHotelSections(initialData.hotel || []);
       setTicketSections(initialData.tickets || []);
       setVisaSections(initialData.visa || []);
+      setToursSections(initialData.tours || []);
+      setTransportSections(initialData.transport || []);
       setOtherSections(initialData.other || []);
       setAmountReceived(initialData.amount_received || 0);
     }
   }, [mode, initialData]);
 
-  const handleAddSection = (type: 'hotel' | 'tickets' | 'visa' | 'other') => {
-    const newSection = { description: '', vendor_amount: 0, selling_amount: 0, check_in: '', check_out: '', room_type: '', meal_plan: '' };
+  const handleAddSection = (type: 'hotel' | 'tickets' | 'visa' | 'tours' | 'transport' | 'other') => {
+    const newSection = { description: '', vendor_id: '', vendor_amount: 0, selling_amount: 0, check_in: '', check_out: '', room_type: '', meal_plan: '', visa_type: '', visa_country: '', airline_name: '', travel_date: '', sectors: '' };
     if (type === 'hotel') setHotelSections([...hotelSections, newSection]);
     if (type === 'tickets') setTicketSections([...ticketSections, newSection]);
     if (type === 'visa') setVisaSections([...visaSections, newSection]);
+    if (type === 'tours') setToursSections([...toursSections, newSection]);
+    if (type === 'transport') setTransportSections([...transportSections, newSection]);
     if (type === 'other') setOtherSections([...otherSections, newSection]);
   };
 
@@ -46,6 +53,8 @@ export function InvoiceForm({ mode, initialData, customers, onSave, onCancel }: 
     if (type === 'hotel') { sections = [...hotelSections]; setSections = setHotelSections; }
     if (type === 'tickets') { sections = [...ticketSections]; setSections = setTicketSections; }
     if (type === 'visa') { sections = [...visaSections]; setSections = setVisaSections; }
+    if (type === 'tours') { sections = [...toursSections]; setSections = setToursSections; }
+    if (type === 'transport') { sections = [...transportSections]; setSections = setTransportSections; }
     if (type === 'other') { sections = [...otherSections]; setSections = setOtherSections; }
     
     (sections[index] as any)[field] = value;
@@ -68,6 +77,16 @@ export function InvoiceForm({ mode, initialData, customers, onSave, onCancel }: 
               className="flex-1 border border-slate-300 p-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
               value={sec.description} onChange={e => handleUpdateSection(type, i, 'description', e.target.value)} 
             />
+            <select
+              className="w-40 border border-slate-300 p-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+              value={sec.vendor_id || ''} 
+              onChange={e => handleUpdateSection(type, i, 'vendor_id', e.target.value)}
+            >
+              <option value="">Select Vendor...</option>
+              {vendors.map(v => (
+                <option key={v.id} value={v.id}>{v.name}</option>
+              ))}
+            </select>
             <input 
               type="number" placeholder="Vendor Cost" 
               className="w-32 border border-slate-300 p-2 rounded text-sm focus:ring-2 focus:ring-blue-500 outline-none"
@@ -93,6 +112,19 @@ export function InvoiceForm({ mode, initialData, customers, onSave, onCancel }: 
               <input type="text" placeholder="Meal Plan (e.g. FB, BB)" className="flex-1 border border-slate-300 p-2 rounded text-sm min-w-[120px] focus:ring-2 focus:ring-blue-500 outline-none" value={sec.meal_plan || ''} onChange={e => handleUpdateSection(type, i, 'meal_plan', e.target.value)} />
             </div>
           )}
+          {type === 'tickets' && (
+            <div className="flex gap-2 flex-wrap mt-2">
+              <input type="text" placeholder="Airline Name (e.g. Emirates)" className="flex-1 border border-slate-300 p-2 rounded text-sm min-w-[150px] focus:ring-2 focus:ring-blue-500 outline-none" value={sec.airline_name || ''} onChange={e => handleUpdateSection(type, i, 'airline_name', e.target.value)} />
+              <input type="date" className="flex-1 border border-slate-300 p-2 rounded text-sm text-slate-600 min-w-[150px] focus:ring-2 focus:ring-blue-500 outline-none" value={sec.travel_date || ''} onChange={e => handleUpdateSection(type, i, 'travel_date', e.target.value)} />
+              <input type="text" placeholder="Sectors (e.g. KHI-DXB-KHI)" className="flex-1 border border-slate-300 p-2 rounded text-sm min-w-[150px] focus:ring-2 focus:ring-blue-500 outline-none" value={sec.sectors || ''} onChange={e => handleUpdateSection(type, i, 'sectors', e.target.value)} />
+            </div>
+          )}
+          {type === 'visa' && (
+            <div className="flex gap-2 flex-wrap mt-2">
+              <input type="text" placeholder="Visa Type (e.g. Tourist, Business)" className="flex-1 border border-slate-300 p-2 rounded text-sm min-w-[150px] focus:ring-2 focus:ring-blue-500 outline-none" value={sec.visa_type || ''} onChange={e => handleUpdateSection(type, i, 'visa_type', e.target.value)} />
+              <input type="text" placeholder="Country (e.g. UAE, UK)" className="flex-1 border border-slate-300 p-2 rounded text-sm min-w-[150px] focus:ring-2 focus:ring-blue-500 outline-none" value={sec.visa_country || ''} onChange={e => handleUpdateSection(type, i, 'visa_country', e.target.value)} />
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -109,6 +141,8 @@ export function InvoiceForm({ mode, initialData, customers, onSave, onCancel }: 
       hotel: hotelSections,
       tickets: ticketSections,
       visa: visaSections,
+      tours: toursSections,
+      transport: transportSections,
       other: otherSections,
       amount_received: amountReceived
     };
@@ -121,7 +155,7 @@ export function InvoiceForm({ mode, initialData, customers, onSave, onCancel }: 
   };
 
   const calculateTotal = (sections: InvoiceSection[]) => sections.reduce((sum, item) => sum + (item.selling_amount || 0), 0);
-  const totalAmount = calculateTotal(hotelSections) + calculateTotal(ticketSections) + calculateTotal(visaSections) + calculateTotal(otherSections);
+  const totalAmount = calculateTotal(hotelSections) + calculateTotal(ticketSections) + calculateTotal(visaSections) + calculateTotal(toursSections) + calculateTotal(transportSections) + calculateTotal(otherSections);
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-in fade-in p-4">
@@ -161,6 +195,8 @@ export function InvoiceForm({ mode, initialData, customers, onSave, onCancel }: 
             {renderSectionInputs('Hotels', 'hotel', hotelSections)}
             {renderSectionInputs('Tickets', 'tickets', ticketSections)}
             {renderSectionInputs('Visa', 'visa', visaSections)}
+            {renderSectionInputs('Tours', 'tours', toursSections)}
+            {renderSectionInputs('Transport', 'transport', transportSections)}
             {renderSectionInputs('Other', 'other', otherSections)}
           </div>
 

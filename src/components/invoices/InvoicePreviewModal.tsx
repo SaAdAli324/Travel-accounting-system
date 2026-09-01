@@ -6,11 +6,12 @@ import { api } from '../../services/api';
 interface InvoicePreviewModalProps {
   invoice: Invoice;
   party: Party | undefined;
+  vendors: Party[];
   onClose: () => void;
   onPrint: (inv: Invoice) => void;
 }
 
-export function InvoicePreviewModal({ invoice, party, onClose, onPrint }: InvoicePreviewModalProps) {
+export function InvoicePreviewModal({ invoice, party, vendors, onClose, onPrint }: InvoicePreviewModalProps) {
   const [payments, setPayments] = useState<any[]>([]);
 
   useEffect(() => {
@@ -27,7 +28,7 @@ export function InvoicePreviewModal({ invoice, party, onClose, onPrint }: Invoic
     }
   }, [invoice.id]);
   
-  const renderSection = (title: string, sections: InvoiceSection[], isHotel = false) => {
+  const renderSection = (title: string, sections: InvoiceSection[], isHotel = false, isVisa = false, isTickets = false) => {
     if (!sections || sections.length === 0) return null;
     return (
       <div className="mb-6">
@@ -39,7 +40,9 @@ export function InvoicePreviewModal({ invoice, party, onClose, onPrint }: Invoic
                 <th className="px-3 py-2">Description</th>
                 {isHotel && <th className="px-3 py-2">Check In/Out</th>}
                 {isHotel && <th className="px-3 py-2">Room/Meal</th>}
-                <th className="px-3 py-2 text-right">Vendor Price</th>
+                {isVisa && <th className="px-3 py-2">Visa Details</th>}
+                {isTickets && <th className="px-3 py-2">Ticket Details</th>}
+                <th className="px-3 py-2">Vendor Details</th>
                 <th className="px-3 py-2 text-right">Selling Price</th>
               </tr>
             </thead>
@@ -59,7 +62,23 @@ export function InvoicePreviewModal({ invoice, party, onClose, onPrint }: Invoic
                       <div className="text-xs text-slate-500">{sec.meal_plan || '-'}</div>
                     </td>
                   )}
-                  <td className="px-3 py-2 text-right">Rs. {(sec.vendor_amount || 0).toLocaleString()}</td>
+                  {isVisa && (
+                    <td className="px-3 py-2">
+                      <div className="text-xs text-slate-500">Type: {sec.visa_type || '-'}</div>
+                      <div className="text-xs text-slate-500">Country: {sec.visa_country || '-'}</div>
+                    </td>
+                  )}
+                  {isTickets && (
+                    <td className="px-3 py-2">
+                      <div className="text-xs text-slate-500">Airline: {sec.airline_name || '-'}</div>
+                      <div className="text-xs text-slate-500">Date: {sec.travel_date || '-'}</div>
+                      <div className="text-xs text-slate-500">Sectors: {sec.sectors || '-'}</div>
+                    </td>
+                  )}
+                  <td className="px-3 py-2">
+                    <div className="text-xs text-slate-500">{sec.vendor_id ? (vendors.find(v => v.id === sec.vendor_id)?.name || 'Unknown') : '-'}</div>
+                    <div className="text-xs font-medium text-slate-700">Cost: Rs. {(sec.vendor_amount || 0).toLocaleString()}</div>
+                  </td>
                   <td className="px-3 py-2 text-right font-medium text-slate-900">Rs. {(sec.selling_amount || 0).toLocaleString()}</td>
                 </tr>
               ))}
@@ -123,10 +142,40 @@ export function InvoicePreviewModal({ invoice, party, onClose, onPrint }: Invoic
 
           <div className="space-y-2">
             {renderSection('Hotel Details', invoice.hotel || [], true)}
-            {renderSection('Ticketing Details', invoice.tickets || [])}
-            {renderSection('Visa Details', invoice.visa || [])}
+            {renderSection('Ticketing Details', invoice.tickets || [], false, false, true)}
+            {renderSection('Visa Details', invoice.visa || [], false, true)}
+            {renderSection('Tours', invoice.tours || [])}
+            {renderSection('Transport', invoice.transport || [])}
             {renderSection('Other Services', invoice.other || [])}
           </div>
+
+          {invoice.refunds && invoice.refunds.length > 0 && (
+            <div className="mt-8">
+              <h4 className="font-semibold text-slate-800 border-b border-slate-200 pb-2 mb-3">Refunds & Adjustments</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-red-50 text-red-800">
+                    <tr>
+                      <th className="px-3 py-2">Date</th>
+                      <th className="px-3 py-2">Description</th>
+                      <th className="px-3 py-2 text-right">Vendor Refund</th>
+                      <th className="px-3 py-2 text-right">Customer Refund</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-red-100">
+                    {invoice.refunds.map((r, i) => (
+                      <tr key={i} className="hover:bg-red-50/50 text-red-700">
+                        <td className="px-3 py-2">{new Date(r.date).toLocaleDateString()}</td>
+                        <td className="px-3 py-2">{r.description}</td>
+                        <td className="px-3 py-2 text-right">Rs. {r.vendor_amount.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right font-medium">Rs. {r.selling_amount.toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {payments.length > 0 && (
             <div className="mt-8">

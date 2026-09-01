@@ -8,6 +8,7 @@ import Journals from './pages/Journals';
 import Ledger from './pages/Ledger';
 import Invoices from './pages/Invoices';
 import Customers from './pages/Customers';
+import Vendors from './pages/Vendors';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Visa from './pages/Visa';
@@ -48,6 +49,7 @@ function App() {
           <Route path="umrah" element={<Umrah />} />
           
           <Route path="customers" element={<Customers />} />
+          <Route path="vendors" element={<Vendors />} />
           <Route path="invoices" element={<Invoices />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<Settings />} />

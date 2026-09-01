@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Search, Trash2, X, Loader2, DollarSign, Edit2, Printer } from 'lucide-react';
+import { Plus, Search, Trash2, X, Loader2, DollarSign, Edit2, Printer, RotateCcw } from 'lucide-react';
 import { api } from '../services/api';
 import type { Invoice, Party } from '../types';
 import { DialogModal, type DialogType } from '../components/ui/DialogModal';
@@ -12,6 +12,7 @@ import { logoBase64 } from '../assets/logoBase64';
 export default function Invoices() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [customers, setCustomers] = useState<Party[]>([]);
+  const [vendors, setVendors] = useState<Party[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -31,19 +32,27 @@ export default function Invoices() {
   const [isRecordingPayment, setIsRecordingPayment] = useState(false);
   const [dialog, setDialog] = useState<{isOpen: boolean, type: DialogType, message: string, title?: string}>({ isOpen: false, type: 'success', message: '' });
 
-  // Payment Form State
   const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
   const [paymentNotes, setPaymentNotes] = useState<string>('');
 
+  // Refund Form State
+  const [refundInvoiceId, setRefundInvoiceId] = useState<string | null>(null);
+  const [refundDescription, setRefundDescription] = useState<string>('');
+  const [refundVendorAmount, setRefundVendorAmount] = useState<number>(0);
+  const [refundSellingAmount, setRefundSellingAmount] = useState<number>(0);
+  const [isRecordingRefund, setIsRecordingRefund] = useState(false);
+
   const fetchInitialData = async () => {
     try {
-      const [invData, custData] = await Promise.all([
+      const [invData, custData, vendorData] = await Promise.all([
         api.getInvoices(),
-        api.getParties('customer')
+        api.getParties('customer'),
+        api.getParties('vendor')
       ]);
       setInvoices(invData);
       setCustomers(custData);
+      setVendors(vendorData);
     } catch (err) {
       console.error(err);
     } finally {
@@ -180,41 +189,133 @@ export default function Invoices() {
     
     y += 20;
 
-    const tableRows: any[] = [];
-    
-    const sections = [
-      { name: 'Hotel', data: inv.hotel || [] },
-      { name: 'Tickets', data: inv.tickets || [] },
-      { name: 'Visa', data: inv.visa || [] },
-      { name: 'Other', data: inv.other || [] },
+    let currentY = y;
+
+    if (inv.hotel && inv.hotel.length > 0) {
+      const hotelRows = inv.hotel.filter((i: any) => i.selling_amount > 0 || i.description).map((i: any) => [
+        i.description || '-',
+        i.check_in || '-',
+        i.check_out || '-',
+        i.room_type || '-',
+        i.meal_plan || '-',
+        `Rs. ${(i.selling_amount || 0).toLocaleString()}`
+      ]);
+      if (hotelRows.length > 0) {
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(11);
+        doc.text("Hotel Details", 14, currentY);
+        currentY += 5;
+        autoTable(doc, {
+          head: [["Description", "Check In", "Check Out", "Room", "Meal", "Amount"]],
+          body: hotelRows,
+          startY: currentY,
+          styles: { fontSize: 9 },
+          headStyles: { fillColor: [59, 130, 246] }
+        });
+        currentY = (doc as any).lastAutoTable.finalY + 10;
+      }
+    }
+
+    if (inv.tickets && inv.tickets.length > 0) {
+      const ticketRows = inv.tickets.filter((i: any) => i.selling_amount > 0 || i.description).map((i: any) => [
+        i.description || '-',
+        i.airline_name || '-',
+        i.travel_date || '-',
+        i.sectors || '-',
+        `Rs. ${(i.selling_amount || 0).toLocaleString()}`
+      ]);
+      if (ticketRows.length > 0) {
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(11);
+        doc.text("Ticketing Details", 14, currentY);
+        currentY += 5;
+        autoTable(doc, {
+          head: [["Description", "Airline", "Date", "Sectors", "Amount"]],
+          body: ticketRows,
+          startY: currentY,
+          styles: { fontSize: 9 },
+          headStyles: { fillColor: [59, 130, 246] }
+        });
+        currentY = (doc as any).lastAutoTable.finalY + 10;
+      }
+    }
+
+    if (inv.visa && inv.visa.length > 0) {
+      const visaRows = inv.visa.filter((i: any) => i.selling_amount > 0 || i.description).map((i: any) => [
+        i.description || '-',
+        i.visa_type || '-',
+        i.visa_country || '-',
+        `Rs. ${(i.selling_amount || 0).toLocaleString()}`
+      ]);
+      if (visaRows.length > 0) {
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(11);
+        doc.text("Visa Details", 14, currentY);
+        currentY += 5;
+        autoTable(doc, {
+          head: [["Description", "Type", "Country", "Amount"]],
+          body: visaRows,
+          startY: currentY,
+          styles: { fontSize: 9 },
+          headStyles: { fillColor: [59, 130, 246] }
+        });
+        currentY = (doc as any).lastAutoTable.finalY + 10;
+      }
+    }
+
+    const simpleSections = [
+      { name: 'Tours', data: inv.tours || [] },
+      { name: 'Transport', data: inv.transport || [] },
+      { name: 'Other Services', data: inv.other || [] },
     ];
-    
-    sections.forEach(sec => {
-      sec.data.forEach((item: any) => {
-        if (item.selling_amount > 0 || item.description) {
-           let desc = `${sec.name}: ${item.description}`;
-           if (sec.name === 'Hotel' && (item.check_in || item.check_out || item.room_type || item.meal_plan)) {
-             const details = [];
-             if (item.check_in) details.push(`In: ${item.check_in}`);
-             if (item.check_out) details.push(`Out: ${item.check_out}`);
-             if (item.room_type) details.push(item.room_type);
-             if (item.meal_plan) details.push(item.meal_plan);
-             desc += `\n(${details.join(' | ')})`;
-           }
-           tableRows.push([desc, `Rs. ${item.selling_amount.toLocaleString()}`]);
+
+    simpleSections.forEach(sec => {
+      if (sec.data.length > 0) {
+        const rows = sec.data.filter((i: any) => i.selling_amount > 0 || i.description).map((i: any) => [
+          i.description || '-',
+          `Rs. ${(i.selling_amount || 0).toLocaleString()}`
+        ]);
+        if (rows.length > 0) {
+          doc.setFont(undefined, 'bold');
+          doc.setFontSize(11);
+          doc.text(sec.name, 14, currentY);
+          currentY += 5;
+          autoTable(doc, {
+            head: [["Description", "Amount"]],
+            body: rows,
+            startY: currentY,
+            styles: { fontSize: 9 },
+            headStyles: { fillColor: [59, 130, 246] }
+          });
+          currentY = (doc as any).lastAutoTable.finalY + 10;
         }
-      });
+      }
     });
 
-    autoTable(doc, {
-      head: [["Description", "Amount"]],
-      body: tableRows,
-      startY: y,
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [59, 130, 246] }
-    });
+    if (inv.refunds && inv.refunds.length > 0) {
+      const refundRows = inv.refunds.filter((r: any) => r.selling_amount > 0 || r.description).map((r: any) => [
+        r.description || '-',
+        `- Rs. ${(r.selling_amount || 0).toLocaleString()}`
+      ]);
+      if (refundRows.length > 0) {
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(11);
+        doc.text("Refunds", 14, currentY);
+        currentY += 5;
+        autoTable(doc, {
+          head: [["Description", "Amount"]],
+          body: refundRows,
+          startY: currentY,
+          styles: { fontSize: 9 },
+          headStyles: { fillColor: [239, 68, 68] } // red-500
+        });
+        currentY = (doc as any).lastAutoTable.finalY + 10;
+      }
+    }
 
-    let currentY = (doc as any).lastAutoTable.finalY + 10;
+    if ((doc as any).lastAutoTable) {
+      currentY = (doc as any).lastAutoTable.finalY + 10;
+    }
 
     if (payments && payments.length > 0) {
       doc.setFont(undefined, 'bold');
@@ -281,6 +382,30 @@ export default function Invoices() {
       setDialog({ isOpen: true, type: 'error', message: 'Failed to record payment' });
     } finally {
       setIsRecordingPayment(false);
+    }
+  };
+
+  const handleIssueRefund = async () => {
+    if (!refundInvoiceId || !refundDescription) return;
+    
+    setIsRecordingRefund(true);
+    try {
+      await api.refundInvoice(refundInvoiceId, {
+        description: refundDescription,
+        vendor_amount: refundVendorAmount,
+        selling_amount: refundSellingAmount
+      });
+      setRefundInvoiceId(null);
+      setRefundDescription('');
+      setRefundVendorAmount(0);
+      setRefundSellingAmount(0);
+      fetchInitialData();
+      setDialog({ isOpen: true, type: 'success', message: 'Refund recorded successfully!' });
+    } catch (err: any) {
+      console.error(err);
+      setDialog({ isOpen: true, type: 'error', message: err.message || 'Failed to record refund' });
+    } finally {
+      setIsRecordingRefund(false);
     }
   };
 
@@ -378,6 +503,7 @@ export default function Invoices() {
           mode={editingInvoice ? 'edit' : 'create'}
           initialData={editingInvoice}
           customers={customers}
+          vendors={vendors}
           onSave={handleSaveInvoice}
           onCancel={() => {
             setShowCreateForm(false);
@@ -439,14 +565,23 @@ export default function Invoices() {
                             <Printer className="w-4 h-4" />
                           </button>
                           {inv.status !== 'Paid' ? (
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setPaymentInvoiceId(inv.id!); }}
+                              className="text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 p-1.5 rounded-full transition-colors"
+                              title="Receive Payment"
+                            >
+                              <DollarSign className="w-4 h-4" />
+                            </button>
+                          ) : null}
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setRefundInvoiceId(inv.id!); }}
+                            className="text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 p-1.5 rounded-full transition-colors"
+                            title="Issue Refund"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+                          {inv.status !== 'Paid' ? (
                             <>
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); setPaymentInvoiceId(inv.id!); }}
-                                className="text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 p-1.5 rounded-full transition-colors"
-                                title="Receive Payment"
-                              >
-                                <DollarSign className="w-4 h-4" />
-                              </button>
                               <button 
                                 onClick={(e) => { e.stopPropagation(); handleEditInvoice(inv); }}
                                 className="text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 p-1.5 rounded-full transition-colors"
@@ -512,6 +647,55 @@ export default function Invoices() {
         </div>
       )}
 
+      {/* Refund Modal */}
+      {refundInvoiceId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl shadow-lg w-96">
+            <h3 className="text-lg font-bold mb-4">Issue Refund</h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Reason / Description *</label>
+              <input 
+                type="text" 
+                className="w-full border p-2 rounded focus:ring-2 focus:ring-amber-500 outline-none"
+                value={refundDescription}
+                onChange={e => setRefundDescription(e.target.value)}
+                placeholder="e.g. Cancelled Flight Ticket"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Vendor Refund Amount (Rs.)</label>
+              <input 
+                type="number" 
+                className="w-full border p-2 rounded focus:ring-2 focus:ring-amber-500 outline-none"
+                value={refundVendorAmount || ''}
+                onChange={e => setRefundVendorAmount(Number(e.target.value))}
+                placeholder="Cost returned by supplier"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Customer Refund Amount (Rs.)</label>
+              <input 
+                type="number" 
+                className="w-full border p-2 rounded focus:ring-2 focus:ring-amber-500 outline-none"
+                value={refundSellingAmount || ''}
+                onChange={e => setRefundSellingAmount(Number(e.target.value))}
+                placeholder="Amount returning to customer"
+              />
+            </div>
+            <div className="bg-amber-50 text-amber-800 text-xs p-3 rounded-lg mb-4">
+              <strong>Note:</strong> Refunding a customer will automatically reduce the invoice total. If this invoice is already paid, a negative cash payment will be recorded to balance your books.
+            </div>
+            <div className="flex justify-end gap-2">
+              <button disabled={isRecordingRefund} onClick={() => setRefundInvoiceId(null)} className="px-4 py-2 text-slate-600 bg-slate-100 rounded hover:bg-slate-200 disabled:opacity-50">Cancel</button>
+              <button disabled={isRecordingRefund} onClick={handleIssueRefund} className="px-4 py-2 text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50 flex items-center gap-2">
+                {isRecordingRefund && <Loader2 className="w-4 h-4 animate-spin" />}
+                Submit Refund
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <DialogModal 
         isOpen={dialog.isOpen} 
         type={dialog.type} 
@@ -526,6 +710,7 @@ export default function Invoices() {
         <InvoicePreviewModal
           invoice={previewInvoice}
           party={customers.find(c => c.id === (typeof previewInvoice.party_id === 'object' ? (previewInvoice.party_id as any).id || (previewInvoice.party_id as any)._id : previewInvoice.party_id))}
+          vendors={vendors}
           onClose={() => setPreviewInvoice(null)}
           onPrint={handlePrintInvoice}
         />

@@ -45,12 +45,26 @@ export interface JournalLine {
 
 export interface InvoiceSection {
   description: string;
+  vendor_id?: string;
   vendor_amount: number;
   selling_amount: number;
   check_in?: string;
   check_out?: string;
   room_type?: string;
   meal_plan?: string;
+  visa_type?: string;
+  visa_country?: string;
+  airline_name?: string;
+  travel_date?: string;
+  sectors?: string;
+}
+
+export interface Refund {
+  id?: string;
+  date: string;
+  description: string;
+  vendor_amount: number;
+  selling_amount: number;
 }
 
 export interface Invoice {
@@ -62,7 +76,10 @@ export interface Invoice {
   hotel: InvoiceSection[];
   tickets: InvoiceSection[];
   visa: InvoiceSection[];
+  tours: InvoiceSection[];
+  transport: InvoiceSection[];
   other: InvoiceSection[];
+  refunds?: Refund[];
   total_vendor_amount: number;
   total_selling_amount: number;
   total_profit: number;

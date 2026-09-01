@@ -141,6 +141,18 @@ export const api = {
     }
     return res.json();
   },
+  refundInvoice: async (id: string, data: any) => {
+    const res = await authFetch(`${API_URL}/invoices/${id}/refund`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || 'Failed to process refund');
+    }
+    return res.json();
+  },
   deleteInvoice: async (id: string) => {
     const res = await authFetch(`${API_URL}/invoices/${id}`, { method: 'DELETE' });
     if (!res.ok) {
