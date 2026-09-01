@@ -84,15 +84,36 @@ const seedAdminUser = async () => {
   }
 };
 
-if (mongoose.connection.readyState === 0) {
-  mongoose.connect(MONGODB_URI)
-    .then(() => {
-      console.log('Connected to MongoDB Atlas');
-      seedSystemAccounts();
-      seedAdminUser();
-    })
-    .catch(err => console.error('MongoDB connection error:', err));
-}
+let connectionPromise: Promise<any> | null = null;
+
+const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) return;
+  if (connectionPromise) return connectionPromise;
+  
+  connectionPromise = mongoose.connect(MONGODB_URI as string, {
+    serverSelectionTimeoutMS: 15000, // Increase timeout slightly for Vercel
+  }).then(() => {
+    console.log('Connected to MongoDB Atlas');
+    seedSystemAccounts();
+    seedAdminUser();
+  }).catch(err => {
+    console.error('MongoDB connection error:', err);
+    connectionPromise = null;
+    throw err;
+  });
+  
+  return connectionPromise;
+};
+
+// Global middleware to ensure database connection is established before routing
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    res.status(500).json({ error: 'Database connection failed during cold start' });
+  }
+});
 
 // API Routes
 app.use('/api/auth', authRoutes);
