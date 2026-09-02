@@ -169,8 +169,8 @@ export default function Ledger() {
         entry.narration,
         acc ? `${acc.account_code} - ${acc.account_name}` : 'Unknown',
         party ? party.name : '-',
-        entry.debit > 0 ? entry.debit : '-',
-        entry.credit > 0 ? entry.credit : '-',
+        entry.debit > 0 ? entry.debit.toLocaleString() : '-',
+        entry.credit > 0 ? entry.credit.toLocaleString() : '-',
       ];
 
       if (selectedAccount) {
@@ -180,7 +180,7 @@ export default function Ledger() {
       }
 
       if (selectedAccount || selectedParty) {
-         entryData.push(entry.balance);
+         entryData.push(entry.balance.toLocaleString());
       }
 
       tableRows.push(entryData);

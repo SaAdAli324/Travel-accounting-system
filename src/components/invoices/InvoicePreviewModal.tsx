@@ -79,7 +79,9 @@ export function InvoicePreviewModal({ invoice, party, vendors, onClose, onPrint 
                     <div className="text-xs text-slate-500">{sec.vendor_id ? (vendors.find(v => v.id === sec.vendor_id)?.name || 'Unknown') : '-'}</div>
                     <div className="text-xs font-medium text-slate-700">Cost: Rs. {(sec.vendor_amount || 0).toLocaleString()}</div>
                   </td>
-                  <td className="px-3 py-2 text-right font-medium text-slate-900">Rs. {(sec.selling_amount || 0).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right font-medium text-slate-900">
+                    {sec.selling_amount > 0 ? `Rs. ${sec.selling_amount.toLocaleString()}` : '-'}
+                  </td>
                 </tr>
               ))}
             </tbody>

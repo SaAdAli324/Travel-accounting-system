@@ -198,7 +198,7 @@ export default function Invoices() {
         i.check_out || '-',
         i.room_type || '-',
         i.meal_plan || '-',
-        `Rs. ${(i.selling_amount || 0).toLocaleString()}`
+        i.selling_amount > 0 ? `Rs. ${i.selling_amount.toLocaleString()}` : '-'
       ]);
       if (hotelRows.length > 0) {
         doc.setFont(undefined, 'bold');
@@ -222,7 +222,7 @@ export default function Invoices() {
         i.airline_name || '-',
         i.travel_date || '-',
         i.sectors || '-',
-        `Rs. ${(i.selling_amount || 0).toLocaleString()}`
+        i.selling_amount > 0 ? `Rs. ${i.selling_amount.toLocaleString()}` : '-'
       ]);
       if (ticketRows.length > 0) {
         doc.setFont(undefined, 'bold');
@@ -245,7 +245,7 @@ export default function Invoices() {
         i.description || '-',
         i.visa_type || '-',
         i.visa_country || '-',
-        `Rs. ${(i.selling_amount || 0).toLocaleString()}`
+        i.selling_amount > 0 ? `Rs. ${i.selling_amount.toLocaleString()}` : '-'
       ]);
       if (visaRows.length > 0) {
         doc.setFont(undefined, 'bold');
@@ -273,7 +273,7 @@ export default function Invoices() {
       if (sec.data.length > 0) {
         const rows = sec.data.filter((i: any) => i.selling_amount > 0 || i.description).map((i: any) => [
           i.description || '-',
-          `Rs. ${(i.selling_amount || 0).toLocaleString()}`
+          i.selling_amount > 0 ? `Rs. ${i.selling_amount.toLocaleString()}` : '-'
         ]);
         if (rows.length > 0) {
           doc.setFont(undefined, 'bold');
@@ -344,6 +344,13 @@ export default function Invoices() {
       });
       
       currentY = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // Check if we need a new page for totals
+    const pageHeight = doc.internal.pageSize.getHeight();
+    if (currentY + 20 > pageHeight - 10) {
+      doc.addPage();
+      currentY = 20;
     }
 
     // Totals block at the very bottom
