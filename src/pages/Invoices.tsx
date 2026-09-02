@@ -354,12 +354,27 @@ export default function Invoices() {
     }
 
     // Totals block at the very bottom
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Total Amount: Rs. ${(inv.total_selling_amount || 0).toLocaleString()}`, 130, currentY);
-    doc.text(`Amount Received: Rs. ${(inv.amount_received || 0).toLocaleString()}`, 130, currentY + 7);
-    doc.setFont(undefined, 'bold');
-    doc.text(`Balance Due: Rs. ${((inv.total_selling_amount || 0) - (inv.amount_received || 0)).toLocaleString()}`, 130, currentY + 14);
+    currentY += 5;
+    autoTable(doc, {
+      body: [
+        ["Total Amount", `Rs. ${(inv.total_selling_amount || 0).toLocaleString()}`],
+        ["Amount Received", `Rs. ${(inv.amount_received || 0).toLocaleString()}`],
+        ["Balance Due", `Rs. ${((inv.total_selling_amount || 0) - (inv.amount_received || 0)).toLocaleString()}`]
+      ],
+      startY: currentY,
+      margin: { left: 65, right: 65 },
+      theme: 'grid',
+      styles: { fontSize: 10, cellPadding: 4, textColor: [15, 23, 42], lineColor: [203, 213, 225], lineWidth: 0.1 },
+      columnStyles: {
+        0: { fontStyle: 'bold', halign: 'left', fillColor: [248, 250, 252] },
+        1: { fontStyle: 'bold', halign: 'right', fillColor: [255, 255, 255] }
+      },
+      didParseCell: function (data) {
+        if (data.row.index === 2) {
+          data.cell.styles.fillColor = [226, 232, 240]; // slightly darker slate for balance row
+        }
+      }
+    });
 
     doc.save(`Invoice_${inv.invoice_number}.pdf`);
   };
