@@ -24,6 +24,7 @@ const navItems = [
   { name: 'Accounts (COA)', path: '/accounting', icon: BookOpen },
   { name: 'Journal Entries', path: '/journals', icon: FileText },
   { name: 'General Ledger', path: '/ledger', icon: BookOpen },
+  { name: 'Vendor Ledger', path: '/vendor-ledger', icon: BookOpen },
   { name: 'Visa Processing', path: '/visa', icon: Briefcase },
   { name: 'Umrah & Hajj', path: '/umrah', icon: Map },
   { name: 'Reports / Profit', path: '/reports', icon: FileText },

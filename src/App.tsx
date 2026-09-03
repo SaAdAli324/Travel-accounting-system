@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Accounting from './pages/Accounting';
 import Journals from './pages/Journals';
 import Ledger from './pages/Ledger';
+import VendorLedger from './pages/VendorLedger';
 import Invoices from './pages/Invoices';
 import Customers from './pages/Customers';
 import Vendors from './pages/Vendors';
@@ -45,6 +46,7 @@ function App() {
           <Route path="accounting" element={<Accounting />} />
           <Route path="journals" element={<Journals />} />
           <Route path="ledger" element={<Ledger />} />
+          <Route path="vendor-ledger" element={<VendorLedger />} />
           <Route path="visa" element={<Visa />} />
           <Route path="umrah" element={<Umrah />} />
           

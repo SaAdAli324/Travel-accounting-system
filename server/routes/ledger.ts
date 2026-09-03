@@ -56,10 +56,13 @@ router.get('/party/:partyId', async (req: Request, res: Response): Promise<any> 
     const party = await Party.findById(partyId);
     if (!party) return res.status(404).json({ error: 'Party not found' });
 
-    const arAccount = await COA.findOne({ account_code: '1200' });
-    if (!arAccount) return res.status(404).json({ error: 'AR Account not found' });
+    const isVendor = party.party_type.toLowerCase() === 'vendor';
+    const accountCode = isVendor ? '2000' : '1200';
     
-    const accountId = arAccount._id.toString();
+    const controlAccount = await COA.findOne({ account_code: accountCode });
+    if (!controlAccount) return res.status(404).json({ error: 'Control Account not found' });
+    
+    const accountId = controlAccount._id.toString();
 
     const entries = await JournalEntry.find({ 'lines.party_id': partyId, 'lines.account_id': accountId }).sort({ date: 1, createdAt: 1 }).lean();
     
@@ -72,7 +75,13 @@ router.get('/party/:partyId', async (req: Request, res: Response): Promise<any> 
           const debit = line.debit || 0;
           const credit = line.credit || 0;
           
-          runningBalance += debit - credit;
+          if (isVendor) {
+            // For vendors (AP/Liability), credit increases balance
+            runningBalance += credit - debit;
+          } else {
+            // For customers (AR/Asset), debit increases balance
+            runningBalance += debit - credit;
+          }
           
           ledgerLines.push({
             id: line._id?.toString() || Math.random().toString(),

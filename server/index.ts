@@ -51,12 +51,14 @@ const seedSystemAccounts = async () => {
   const systemAccounts = [
     { account_code: '1200', account_name: 'Accounts Receivable', account_type: 'asset', is_system: true },
     { account_code: '1010', account_name: 'Cash / Bank', account_type: 'asset', is_system: true },
+    { account_code: '2000', account_name: 'Accounts Payable', account_type: 'liability', is_system: true },
     { account_code: '4010', account_name: 'Ticket Sales Revenue', account_type: 'revenue', is_system: true },
     { account_code: '4020', account_name: 'Hotel Sales Revenue', account_type: 'revenue', is_system: true },
     { account_code: '4030', account_name: 'Visa Sales Revenue', account_type: 'revenue', is_system: true },
     { account_code: '4040', account_name: 'Tours Revenue', account_type: 'revenue', is_system: true },
     { account_code: '4050', account_name: 'Transport Revenue', account_type: 'revenue', is_system: true },
     { account_code: '4090', account_name: 'Other Revenue', account_type: 'revenue', is_system: true },
+    { account_code: '5000', account_name: 'Cost of Sales', account_type: 'expense', is_system: true },
   ];
 
   for (const acc of systemAccounts) {
